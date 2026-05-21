@@ -3,6 +3,7 @@ import logging
 from awsglue.utils import getResolvedOptions
 from awsglue.context import GlueContext
 from awsglue.job import Job
+from awsglue.dynamicframe import DynamicFrame
 from pyspark.context import SparkContext
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
@@ -85,13 +86,13 @@ logger.info(f"receita total: R$ {fact_vendas.agg(F.sum('valor')).collect()[0][0]
 # ------- LOAD -------
 
 # nome da connection precisa bater com o que foi criado no Terraform (módulo glue)
-REDSHIFT_CONN = "melhorplano-dw-redshift-conn"
+REDSHIFT_CONN = "mpdw-redshift-conn"
 redshift_db = args["REDSHIFT_JDBC_URL"].split("/")[-1]
 
 
 def carregar(df, tabela):
     logger.info(f"Carregando tabela: {tabela}")
-    dyn = glueContext.create_dynamic_frame.from_dataframe(df, glueContext)
+    dyn = DynamicFrame.fromDF(df, glueContext, tabela)
     glueContext.write_dynamic_frame.from_jdbc_conf(
         frame=dyn,
         catalog_connection=REDSHIFT_CONN,
