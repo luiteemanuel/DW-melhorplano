@@ -1,3 +1,7 @@
+data "aws_subnet" "selected" {
+  id = var.subnet_id
+}
+
 resource "aws_glue_catalog_database" "main" {
   name = "${replace(var.project, "-", "_")}_db"
 }
@@ -33,6 +37,12 @@ resource "aws_glue_connection" "redshift" {
     JDBC_CONNECTION_URL = "jdbc:redshift://${var.redshift_endpoint}/${var.redshift_db_name}"
     USERNAME            = var.redshift_username
     PASSWORD            = var.redshift_password
+  }
+
+  physical_connection_requirements {
+    availability_zone      = data.aws_subnet.selected.availability_zone
+    subnet_id              = var.subnet_id
+    security_group_id_list = [var.security_group_id]
   }
 
   tags = var.tags

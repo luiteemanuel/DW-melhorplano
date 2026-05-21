@@ -9,6 +9,23 @@ data "aws_subnets" "default" {
   }
 }
 
+data "aws_region" "current" {}
+
+data "aws_route_tables" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = data.aws_vpc.default.id
+  service_name      = "com.amazonaws.${data.aws_region.current.name}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = data.aws_route_tables.default.ids
+  tags              = var.tags
+}
+
 resource "aws_security_group" "redshift" {
   name        = "${var.project}-redshift-sg"
   description = "Allow Redshift access from Glue"
@@ -20,6 +37,14 @@ resource "aws_security_group" "redshift" {
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.default.cidr_block]
     description = "Redshift port from within VPC"
+  }
+
+  ingress {
+    from_port = 0
+    to_port   = 0
+    protocol  = "-1"
+    self      = true
+    description = "Glue self-referencing rule"
   }
 
   egress {
@@ -43,12 +68,14 @@ resource "aws_redshift_cluster" "main" {
   database_name             = var.db_name
   master_username           = var.master_username
   master_password           = var.master_password
-  node_type                 = "dc2.large"
+  node_type                 = "ra3.xlplus"
   cluster_type              = "single-node"
   cluster_subnet_group_name = aws_redshift_subnet_group.main.name
   vpc_security_group_ids    = [aws_security_group.redshift.id]
-  publicly_accessible       = false
-  skip_final_snapshot       = true
+  publicly_accessible                  = false
+  skip_final_snapshot                  = true
+  encrypted                            = true
+  availability_zone_relocation_enabled = true
   iam_roles                 = [var.redshift_role_arn]
   tags                      = var.tags
 }

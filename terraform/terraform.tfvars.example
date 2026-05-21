@@ -1,5 +1,0 @@
-aws_region        = "us-east-1"
-environment       = "dev"
-redshift_db_name  = "melhorplano"
-redshift_username = "admin"
-redshift_password = "SuaSenhaSegura123!"

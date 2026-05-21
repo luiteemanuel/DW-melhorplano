@@ -13,7 +13,7 @@ provider "aws" {
 }
 
 locals {
-  project = "melhorplano-dw"
+  project = "mpdw"
   tags = {
     Project     = local.project
     Environment = var.environment
@@ -57,5 +57,7 @@ module "glue" {
   redshift_db_name  = var.redshift_db_name
   redshift_username = var.redshift_username
   redshift_password = var.redshift_password
+  subnet_id         = module.redshift.subnet_id
+  security_group_id = module.redshift.security_group_id
   tags              = local.tags
 }
