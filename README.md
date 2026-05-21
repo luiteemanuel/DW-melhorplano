@@ -62,6 +62,74 @@ DW-melhorplano/
 
 ---
 
+## Transformação dos dados (ETL)
+
+O processo de transformação foi feito com **PySpark** rodando no AWS Glue.
+
+### 1. Extração
+
+Os dois arquivos CSV são lidos direto do S3 usando Spark:
+
+```python
+df_vendas   = spark.read.option("header", "true").option("inferSchema", "true").csv("s3://bucket/source/vendas/")
+df_clientes = spark.read.option("header", "true").option("inferSchema", "true").csv("s3://bucket/source/clientes/")
+```
+
+O `inferSchema` detecta os tipos das colunas automaticamente.
+
+### 2. Transformação — dimensão clientes
+
+```python
+dim_clientes = (
+    df_clientes
+    .select("id_cliente", "nome", "email")
+    .dropDuplicates(["id_cliente"])
+    .filter(F.col("id_cliente").isNotNull())
+)
+```
+
+- Remove clientes duplicados pelo `id_cliente`
+- Filtra linhas com `id_cliente` nulo
+
+### 3. Transformação — fato vendas
+
+```python
+df_joined = df_vendas.join(dim_clientes.select("id_cliente"), on="id_cliente", how="inner")
+
+fact_vendas = (
+    df_joined
+    .select(
+        F.col("data").cast("date").alias("data_venda"),
+        F.col("id_cliente"),
+        F.col("produto"),
+        F.col("valor").cast("decimal(10,2)"),
+    )
+    .filter(F.col("data_venda").isNotNull() & F.col("valor").isNotNull())
+)
+
+window = Window.orderBy("data_venda", "id_cliente")
+fact_vendas = fact_vendas.withColumn("id_venda", F.row_number().over(window))
+```
+
+Passo a passo:
+1. **Join com dim_clientes** — garante que só entram vendas com cliente válido (integridade referencial)
+2. **Cast de tipos** — `data` vira `DATE`, `valor` vira `DECIMAL(10,2)`
+3. **Filtro de nulos** — remove linhas sem data ou valor
+4. **Geração do id_venda** — chave surrogate criada com `row_number()` ordenado por data, já que o CSV não tinha essa coluna
+
+### 4. Carga no Redshift
+
+Primeiro carrega `dim_clientes`, depois `fact_vendas` — respeitando a FK:
+
+```python
+carregar(dim_clientes, "dim_clientes")
+carregar(fact_vendas, "fact_vendas")
+```
+
+A carga usa o conector JDBC do Glue com S3 como área de staging temporária (internamente o Redshift faz um `COPY` a partir do S3).
+
+---
+
 ## Como rodar
 
 **Pré-requisitos:** Terraform >= 1.5, AWS CLI configurado
