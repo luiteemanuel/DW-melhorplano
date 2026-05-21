@@ -23,6 +23,22 @@ CSV local → S3 → Glue Crawler → Glue ETL (PySpark) → Redshift
 
 ---
 
+## Infraestrutura provisionada
+
+**S3 — bucket com os arquivos fonte e scripts**
+![S3](img/s3.jpg)
+
+**Glue Crawler — catalogando os CSVs**
+![Crawler](img/crawler-glue.jpg)
+
+**Glue ETL Job — executando a transformação**
+![Glue](img/glue.jpg)
+
+**Redshift — tabelas carregadas no Data Warehouse**
+![Redshift](img/Redshift.jpg)
+
+---
+
 ## Star Schema
 
 ```
@@ -145,6 +161,18 @@ aws configure
 # 3. Rode tudo
 bash scripts/run_pipeline.sh
 ```
+
+---
+
+## Pontos de melhoria
+
+O pipeline hoje roda manualmente via script. Algumas evoluções naturais:
+
+- **Agendamento automático** — usar Amazon EventBridge para disparar o job Glue em horários definidos (ex: todo dia às 6h), sem precisar rodar o script na mão
+- **Trigger por evento** — configurar o EventBridge para disparar o pipeline automaticamente quando novos arquivos chegarem no S3, tornando o processo orientado a eventos
+- **Monitoramento** — adicionar alertas via SNS para notificar quando o job falhar
+- **Remote state** — mover o `terraform.tfstate` para S3 + DynamoDB para trabalho em equipe
+- **Testes de qualidade** — validar contagem de registros e nulos antes de carregar no Redshift
 
 ---
 
